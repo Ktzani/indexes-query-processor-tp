@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+
+# Virtual environment
+.venv/
+venv/
+pa2/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Index files (gerados pelo indexer)
+*.idx
+*.lex
+*.docidx
+*.bin
+
+# Blocos parciais do SPIMI
+blocks/
+tmp/
+
+# Logs e dados de teste
+logs/
+*.log
+
+# Corpus (muito grande pra versionar)
+corpus/
+*.jsonl
+
+# NLTK data
+nltk_data/
+
+# Arquivos de output
+output/
+results/
+*.json
+!samples/sample_queries.json
+
+*.pkl
