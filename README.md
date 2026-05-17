@@ -60,8 +60,8 @@ pa2-indexer/
 ├── src/
 │   ├── config/             # constantes
 │   ├── preprocessing/      # tokenizer, normalizer
-│   ├── indexing/           # SPIMI, partial index, merger
-│   ├── index/              # estruturas em disco
+│   ├── index_build/        # SPIMI, partial index, merger
+│   ├── index_store/        # estruturas em disco
 │   ├── retrieval/          # query, DAAT, scorer, ranker
 │   └── utils/              # memoria, I/O
 └── samples/                # corpus/queries de exemplo

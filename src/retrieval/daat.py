@@ -31,9 +31,9 @@ Thread-safety: nao eh. Cada thread deve criar sua propria instancia.
 
 from dataclasses import dataclass
 
-from src.index.inverted_index import InvertedIndex
-from src.index.posting import Posting
-from src.index.term_lexicon import TermLexicon
+from src.index_store.inverted_index import InvertedIndex
+from src.index_store.posting import Posting
+from src.index_store.term_lexicon import TermLexicon
 
 
 @dataclass

@@ -26,9 +26,9 @@ import sys
 import time
 
 from src.config.indexer import BLOCKS_DIR_NAME, INVERTED_INDEX_FILENAME
-from src.indexing.merger import cleanup_blocks, merge_blocks
-from src.indexing.spimi import SPIMIOrchestrator
-from src.indexing.writer import compute_statistics, write_doc_index, write_lexicon
+from src.index_build.merger import cleanup_blocks, merge_blocks
+from src.index_build.spimi import SPIMIOrchestrator
+from src.index_build.writer import compute_statistics, write_doc_index, write_lexicon
 from src.preprocessing.nltk_setup import ensure_nltk_data
 from src.utils.memory import MemoryMonitor
 

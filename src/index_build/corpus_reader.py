@@ -15,7 +15,7 @@ import sys
 from typing import Iterator
 
 from src.config.indexer import TEXT_ENCODING
-from src.indexing.document import Document
+from src.index_build.document import Document
 
 
 class CorpusReader:

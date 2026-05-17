@@ -27,7 +27,7 @@ Thread-safety:
 import os
 
 from src.config.indexer import INVERTED_INDEX_FILENAME
-from src.index.posting import Posting
+from src.index_store.posting import Posting
 from src.utils.io_utils import read_posting, read_uint32
 
 

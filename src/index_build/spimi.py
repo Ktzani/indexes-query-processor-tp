@@ -33,8 +33,8 @@ from src.config.indexer import (
     QUEUE_MAX_BATCHES,
     READER_BATCH_SIZE,
 )
-from src.indexing.corpus_reader import CorpusReader
-from src.indexing.partial_index import PartialIndex
+from src.index_build.corpus_reader import CorpusReader
+from src.index_build.partial_index import PartialIndex
 from src.preprocessing.tokenizer import Tokenizer
 from src.preprocessing.normalizer import Normalizer
 from src.utils.memory import MemoryMonitor
@@ -314,6 +314,11 @@ class SPIMIOrchestrator:
             )
 
             self._pi.clear()
+            # Forca GC para devolver memoria ao SO/heap o quanto antes.
+            # Sem isso, o RSS pode demorar para baixar e disparar novo
+            # flush prematuramente.
+            import gc
+            gc.collect()
             self._memory.reset_peak()
 
         # Libera processors

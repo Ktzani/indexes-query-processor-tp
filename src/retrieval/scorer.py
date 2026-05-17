@@ -35,9 +35,9 @@ import math
 from abc import ABC, abstractmethod
 
 from src.config.processor import BM25_B, BM25_K1
-from src.index.document_index import DocumentIndex
-from src.index.posting import Posting
-from src.index.term_lexicon import TermLexicon
+from src.index_store.document_index import DocumentIndex
+from src.index_store.posting import Posting
+from src.index_store.term_lexicon import TermLexicon
 
 
 class Scorer(ABC):

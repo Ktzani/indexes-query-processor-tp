@@ -30,9 +30,9 @@ import sys
 import time
 
 from src.config.processor import TEXT_ENCODING, TOP_K
-from src.index.document_index import DocumentIndex
-from src.index.inverted_index import InvertedIndex
-from src.index.term_lexicon import TermLexicon
+from src.index_store.document_index import DocumentIndex
+from src.index_store.inverted_index import InvertedIndex
+from src.index_store.term_lexicon import TermLexicon
 from src.preprocessing.nltk_setup import ensure_nltk_data
 from src.preprocessing.normalizer import Normalizer
 from src.preprocessing.tokenizer import Tokenizer
