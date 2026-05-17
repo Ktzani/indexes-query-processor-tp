@@ -6,8 +6,16 @@ Orquestra o pipeline de indexacao parcial:
 - N threads Processor consomem batches: tokenize -> normalize -> add ao PartialIndex
 - A thread principal monitora memoria e dispara flushes do PartialIndex
 
-Saida: lista de paths de blocks parciais ordenados por termo, e um
-mapping doc_id_int -> {original_id, length} (vira o document index).
+Saida: lista de paths de blocks parciais ordenados por termo, e um par
+(original_ids, lengths) representando o document index.
+
+Document index como arrays paralelos:
+    Em vez de dict[int, dict] (que gastaria ~250-300 bytes/entry por
+    causa do overhead do CPython), usamos dois arrays paralelos:
+        original_ids: list[str]   (indexado por internal_id)
+        lengths: array('I')       (uint32, 4 bytes/entry)
+
+    Para 4.6M docs, isso eh ~70 MB em vez de ~1.2 GB.
 
 Sincronizacao:
     _pi_lock        serializa acesso ao PartialIndex (writes) e ao
@@ -15,11 +23,12 @@ Sincronizacao:
     _flush_event    quando setado, processors pausam apos terminar o
                     batch corrente. Main faz flush, depois reseta o
                     event.
-    _doc_index_lock serializa adicao ao mapping doc_id_int -> metadados.
+    _doc_index_lock serializa adicao aos arrays do document index.
     _done_event     setado pelo Reader quando termina; processors
                     saem quando queue.empty() e este event setado.
 """
 
+import array
 import os
 import queue
 import sys
@@ -67,7 +76,12 @@ class SPIMIOrchestrator:
         # Estruturas compartilhadas
         self._pi = PartialIndex()
         self._pi_lock = threading.Lock()
-        self._doc_index: dict[int, dict] = {}
+        # Document index como arrays paralelos (ver docstring do modulo).
+        # Indexados por internal_id (que eh monotonico, atribuido pelo Reader).
+        # Pre-alocacao impossivel porque nao sabemos o tamanho final;
+        # extendemos sob demanda usando _ensure_capacity.
+        self._original_ids: list[str] = []
+        self._lengths: array.array = array.array("I")  # uint32
         self._doc_index_lock = threading.Lock()
 
         # Sincronizacao
@@ -89,9 +103,17 @@ class SPIMIOrchestrator:
     # API publica
     # =====================================================================
 
-    def run(self) -> tuple[list[str], dict[int, dict]]:
+    def run(self) -> tuple[list[str], tuple[list[str], array.array]]:
         """
-        Executa o pipeline ate o fim. Retorna (block_paths, doc_index).
+        Executa o pipeline ate o fim.
+
+        Retorna:
+            (block_paths, doc_index_data)
+        onde:
+            block_paths: lista de paths dos blocks parciais
+            doc_index_data: tupla (original_ids, lengths)
+                - original_ids: list[str] indexada por internal_id
+                - lengths: array.array('I') com tamanhos por internal_id
         """
         # Inicia Reader
         reader_thread = threading.Thread(
@@ -120,7 +142,7 @@ class SPIMIOrchestrator:
         if not self._pi.is_empty():
             self._do_flush(final=True)
 
-        return self._block_paths, self._doc_index
+        return self._block_paths, (self._original_ids, self._lengths)
 
     # =====================================================================
     # Threads
@@ -209,12 +231,19 @@ class SPIMIOrchestrator:
                 terms = normalizer.normalize(tokens)
                 length = len(terms)
 
-                # Registra no document index
+                # Registra no document index (arrays paralelos).
+                # Como processors podem terminar fora de ordem, o
+                # internal_id pode chegar > len(arrays) atual.
+                # Extendemos as listas conforme necessario.
                 with self._doc_index_lock:
-                    self._doc_index[internal_id] = {
-                        "original_id": doc.id,
-                        "length": length,
-                    }
+                    needed = internal_id + 1
+                    if len(self._original_ids) < needed:
+                        # Extende com placeholders ate cobrir o internal_id
+                        gap = needed - len(self._original_ids)
+                        self._original_ids.extend([""] * gap)
+                        self._lengths.extend([0] * gap)
+                    self._original_ids[internal_id] = doc.id
+                    self._lengths[internal_id] = length
 
                 # Atualiza PI sob lock
                 with self._pi_lock:

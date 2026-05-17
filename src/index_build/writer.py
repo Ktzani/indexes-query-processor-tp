@@ -55,21 +55,39 @@ def write_lexicon(
 
 
 def write_doc_index(
-    doc_index: dict[int, dict],
+    doc_index_data,
     index_dir: str,
 ) -> str:
     """
     Persiste o document index como pickle. Retorna o path do arquivo.
 
-    Formato:
-        dict[internal_id: int -> {
-            "original_id": str,
-            "length": int,    # numero de tokens apos preprocessing
-        }]
+    Aceita:
+        - Tupla (original_ids: list[str], lengths: array.array) — formato
+          eficiente em memoria usado pelo SPIMI.
+        - dict[int, dict] — formato legado (suportado para
+          compatibilidade).
+
+    Formato persistido (no pickle):
+        tupla (original_ids: list[str], lengths: array.array)
+        onde o indice do array eh o internal_id.
     """
+    # Suporte ao formato legado (dict): converte para arrays paralelos
+    # antes de serializar.
+    if isinstance(doc_index_data, dict):
+        import array
+        n = len(doc_index_data)
+        original_ids: list[str] = [""] * n
+        lengths = array.array("I", [0] * n)
+        for internal_id, info in doc_index_data.items():
+            original_ids[internal_id] = info["original_id"]
+            lengths[internal_id] = info["length"]
+        payload = (original_ids, lengths)
+    else:
+        payload = doc_index_data
+
     path = os.path.join(index_dir, DOCUMENT_INDEX_FILENAME)
     with open(path, "wb") as f:
-        pickle.dump(doc_index, f, protocol=_PICKLE_PROTOCOL)
+        pickle.dump(payload, f, protocol=_PICKLE_PROTOCOL)
     return path
 
 
