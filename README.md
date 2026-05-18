@@ -28,7 +28,12 @@ automaticamente.
 ### Indexador
 
 ```bash
-python indexer.py -m 1024 -c corpus.jsonl -i index/
+python indexer.py -m 1024 -c corpus.jsonl -i index/ 2>&1 | Tee-Object -FilePath indexer_log.txt
+```
+
+O que rodei:
+```bash
+python indexer.py -m 1024 -c data\corpus\entities.jsonl -i data\indexes\index_full3\ 2>&1 | Tee-Object -FilePath data\indexes\index_full3_log.txt
 ```
 
 Argumentos:
@@ -41,8 +46,13 @@ Output: JSON em stdout com estatisticas do indice.
 ### Query Processor
 
 ```bash
-python processor.py -i index/ -q queries.txt -r BM25
+python processor.py -i index/ -q queries.txt -r BM25 2>&1 | Tee-Object -FilePath processor_log.txt        
 ```
+
+O que rodei: 
+```bash
+python processor.py -i data\indexes\index_full2\ -q data\queries\real.txt -r BM25 > data\results\real_tfidf.jsonl 2> data\results\real_tfidf.log   
+```  
 
 Argumentos:
 - `-i <INDEX>`: caminho do diretorio com os indices

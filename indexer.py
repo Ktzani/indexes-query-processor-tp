@@ -66,6 +66,14 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="(dev) limita numero de docs lidos (para testes rapidos)",
     )
+    # Permite override do numero de threads do pipeline.
+    # Util para experimentos de speedup.
+    parser.add_argument(
+        "--threads",
+        type=int,
+        default=None,
+        help="(dev) numero de threads do pipeline (default: config NUM_PROCESSOR_THREADS=4)",
+    )
     return parser.parse_args()
 
 
@@ -98,16 +106,26 @@ def main():
         f"[indexer] iniciando SPIMI: corpus={args.c}, mem={args.m}MB",
         file=sys.stderr,
     )
-    spimi = SPIMIOrchestrator(
-        corpus_path=args.c,
-        blocks_dir=blocks_dir,
-        memory=memory,
-        max_docs=args.max_docs,
-    )
+    # Override de threads se especificado via CLI
+    spimi_kwargs = {
+        "corpus_path": args.c,
+        "blocks_dir": blocks_dir,
+        "memory": memory,
+        "max_docs": args.max_docs,
+    }
+    if args.threads is not None:
+        spimi_kwargs["num_threads"] = args.threads
+        print(
+            f"[indexer] usando {args.threads} threads (override)",
+            file=sys.stderr,
+        )
+    spimi = SPIMIOrchestrator(**spimi_kwargs)
     block_paths, doc_index = spimi.run()
+    # doc_index agora eh tupla (original_ids, lengths); usamos len(original_ids).
+    num_docs = len(doc_index[0]) if isinstance(doc_index, tuple) else len(doc_index)
     print(
         f"[indexer] SPIMI concluido: {len(block_paths)} blocks, "
-        f"{len(doc_index)} docs",
+        f"{num_docs} docs",
         file=sys.stderr,
     )
 

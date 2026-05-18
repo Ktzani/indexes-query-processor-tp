@@ -49,3 +49,5 @@ results/
 !samples/sample_queries.json
 
 *.pkl
+
+data/
