@@ -1,27 +1,12 @@
 """
-InvertedIndex: API de leitura random-access do arquivo inverted.idx.
+Leitura random-access do arquivo inverted.idx.
 
-Abre o arquivo binario UMA VEZ e mantem o handle aberto durante todo
-o query processing. Para cada query, faz seek(offset) + read das
-postings.
+Abre o arquivo UMA vez e mantem o handle durante todo o query
+processing. Para cada query, faz seek(offset) + read das postings.
 
-Formato do arquivo (produzido pelo merger):
-    Para cada termo (em ordem alfabetica):
-        [num_postings: uint32]
-        [posting_1 = (doc_id, tf) = 8 bytes]
-        [posting_2 = (doc_id, tf) = 8 bytes]
-        ...
-
-O offset que vem do lexicon aponta para o uint32 num_postings.
-NAO contem o termo: o lexicon eh o unico mapeamento term -> location.
-
-Uso recomendado (context manager):
-    with InvertedIndex(index_dir) as ii:
-        postings = ii.read_postings(offset, df)
-
-Thread-safety:
-    NAO eh thread-safe (file handle compartilhado). Para multi-thread
-    no processor, usar um InvertedIndex por thread.
+Formato (por termo, em ordem alfabetica):
+    [num_postings: uint32][posting_1][posting_2]...
+O offset vem do lexicon; o termo NAO esta no arquivo.
 """
 
 import os
@@ -36,9 +21,6 @@ class InvertedIndex:
 
     def __init__(self, index_dir: str):
         path = os.path.join(index_dir, INVERTED_INDEX_FILENAME)
-        # Abre em modo binario, com buffer grande para reads sequenciais
-        # de postings dentro de uma lista (cada posting eh 8 bytes,
-        # buffering ajuda).
         self._f = open(path, "rb")
 
     def read_postings(self, offset: int, expected_df: int) -> list[Posting]:

@@ -1,27 +1,7 @@
 """
-Writer: persiste lexicon e document index em disco (formato pickle)
-e calcula as estatisticas finais do indice.
-
-O arquivo inverted.idx eh produzido diretamente pelo merger; aqui
-apenas tomamos suas estatisticas (tamanho).
-
-Por que pickle:
-    Lexicon e doc_index sao dicts Python. Pickle eh a forma idiomatica
-    e mais rapida de persisti-los, dado que estamos lock-in em Python
-    (o enunciado pede Python 3.14 estritamente).
-
-Por que protocolo 5:
-    Protocolo 5 (Python 3.8+) suporta out-of-band buffers, importante
-    para dicts grandes (4.6M docs). E mais compacto e mais rapido que
-    protocolos legados.
-
-Saida do write_index:
-    {
-        "Index Size": float,           # MB, total dos 3 arquivos
-        "Elapsed Time": float,         # segundos, preenchido externamente
-        "Number of Lists": int,        # numero de termos
-        "Average List Size": float,    # total_postings / num_lists
-    }
+Persiste lexicon e document index em disco (pickle) e calcula as
+estatisticas finais do indice. O arquivo inverted.idx é produzido
+pelo merger;
 """
 
 import os
@@ -34,7 +14,6 @@ from src.config.indexer import (
 )
 
 
-# Protocolo 5: out-of-band buffers, mais rapido para dicts grandes.
 _PICKLE_PROTOCOL = 5
 
 
@@ -42,12 +21,7 @@ def write_lexicon(
     lexicon: dict[str, tuple[int, int]],
     index_dir: str,
 ) -> str:
-    """
-    Persiste o lexicon como pickle. Retorna o path do arquivo.
-
-    Formato:
-        dict[term: str -> (offset_no_inverted_idx: int, df: int)]
-    """
+    """Persiste lexicon (term -> (offset, df)) como pickle."""
     path = os.path.join(index_dir, TERM_LEXICON_FILENAME)
     with open(path, "wb") as f:
         pickle.dump(lexicon, f, protocol=_PICKLE_PROTOCOL)
@@ -59,20 +33,9 @@ def write_doc_index(
     index_dir: str,
 ) -> str:
     """
-    Persiste o document index como pickle. Retorna o path do arquivo.
-
-    Aceita:
-        - Tupla (original_ids: list[str], lengths: array.array) — formato
-          eficiente em memoria usado pelo SPIMI.
-        - dict[int, dict] — formato legado (suportado para
-          compatibilidade).
-
-    Formato persistido (no pickle):
-        tupla (original_ids: list[str], lengths: array.array)
-        onde o indice do array eh o internal_id.
+    Persiste o document index como tupla (original_ids, lengths).
+    Aceita tambem o formato legado dict[int, dict] e converte.
     """
-    # Suporte ao formato legado (dict): converte para arrays paralelos
-    # antes de serializar.
     if isinstance(doc_index_data, dict):
         import array
         n = len(doc_index_data)
@@ -96,15 +59,8 @@ def compute_statistics(
     lexicon: dict[str, tuple[int, int]],
 ) -> dict:
     """
-    Computa as estatisticas exigidas pelo enunciado.
-
-    Retorna dict com:
-        - Index Size: tamanho total dos 3 arquivos em MB
-        - Number of Lists: numero de termos no lexicon
-        - Average List Size: media de postings por lista
-
-    Nao inclui Elapsed Time: eh responsabilidade do entry point
-    indexer.py medir e preencher.
+    Estatisticas finais do indice: Index Size (MB), Number of Lists,
+    Average List Size. Elapsed Time é preenchido pelo entry point.
     """
     inverted_path = os.path.join(index_dir, INVERTED_INDEX_FILENAME)
     lexicon_path = os.path.join(index_dir, TERM_LEXICON_FILENAME)

@@ -93,7 +93,7 @@ class TestNormalizer(unittest.TestCase):
         self.assertIn("physic", terms)
 
     def test_alphanumeric_kept(self):
-        # "19th" tem letras, nao eh puro numero
+        # "19th" tem letras, nao é puro numero
         terms = self.normalizer.normalize(["19th", "century"])
         self.assertIn("19th", terms)
 

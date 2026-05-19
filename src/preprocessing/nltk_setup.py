@@ -1,13 +1,6 @@
 """
-Garante que os dados necessarios do NLTK (punkt para tokenizacao,
-stopwords para filtro) estejam disponiveis.
-
-Estrategia: tenta usar; se falhar com LookupError, baixa apenas o
-necessario. Idempotente: chamadas subsequentes nao re-baixam.
-
-IMPORTANTE: NLTK busca dados em ~/nltk_data (Linux/Mac) ou
-%APPDATA%/nltk_data (Windows). O download eh feito uma vez por
-ambiente, nao por execucao.
+Garante que os dados necessarios do NLTK (punkt, stopwords) estao
+disponiveis, baixando-os se nao estiverem. Idempotente.
 """
 
 import sys
@@ -16,8 +9,7 @@ import nltk
 
 def _ensure_resource(resource_path: str, resource_name: str):
     """
-    Garante que um recurso NLTK esta disponivel. Tenta localizar; se
-    nao encontrar, baixa silenciosamente.
+    Localiza um recurso NLTK; se nao existir, baixa silenciosamente.
 
     Parametros:
         resource_path: caminho NLTK do recurso (e.g., 'tokenizers/punkt')
@@ -31,12 +23,9 @@ def _ensure_resource(resource_path: str, resource_name: str):
 
 
 def ensure_nltk_data():
-    """
-    Garante que punkt (tokenizer) e stopwords (lista de stopwords)
-    estao disponiveis. Idempotente.
-    """
+    """Garante punkt (tokenizer) e stopwords. Idempotente."""
     _ensure_resource("tokenizers/punkt", "punkt")
-    # NLTK 3.9+ separou alguns dados; punkt_tab eh necessario tambem.
+
     try:
         nltk.data.find("tokenizers/punkt_tab")
     except LookupError:

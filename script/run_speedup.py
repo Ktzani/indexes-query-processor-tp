@@ -1,28 +1,13 @@
 """
 Experimento de speedup variando o numero de threads do indexer.
 
-Para cada N em THREAD_COUNTS:
-    - Roda o indexer.py via subprocess com --threads N
-    - Captura stdout (JSON) e stderr (logs)
-    - Extrai metricas: tempo, num blocks, postings/bloco
-    - Salva tudo em data/experiments/
-
-Output:
-    data/experiments/
-        threads_<N>.log         # log completo (stderr)
-        threads_<N>.json        # JSON final do indexer
-        summary.csv             # tabela consolidada
-        summary.json            # mesmas metricas em JSON
+Para cada N em --threads, roda indexer.py via subprocess com --threads N,
+captura stdout/stderr e salva em data/experiments/ (threads_<N>.log,
+threads_<N>.json, summary.csv, summary.json).
 
 Uso:
-    python experiments/run_speedup.py
-
-    # Para mudar parametros:
-    python experiments/run_speedup.py --max-docs 1000000 --threads 4 8 16
-
-Tempo estimado:
-    ~5-7 min por nivel de threads.
-    Para [4, 8, 16, 32] = ~25-30 min total.
+    python script/run_speedup.py
+    python script/run_speedup.py --max-docs 1000000 --threads 4 8 16
 """
 
 import argparse
@@ -37,13 +22,11 @@ import time
 from pathlib import Path
 
 
-# Configuracao padrao
 DEFAULT_THREADS = [4, 8, 16, 32]
 DEFAULT_MAX_DOCS = 500_000
 DEFAULT_MEMORY = 1024
 DEFAULT_CORPUS = "data/corpus/entities.jsonl"
 
-# Pastas (relativas a raiz do projeto)
 EXP_DIR = Path("data/experiments")
 INDEX_BASE = "data/indexes/experiment_t"
 
@@ -93,12 +76,7 @@ def run_indexer(
     corpus: str,
     index_dir: str,
 ) -> tuple[dict, str, float]:
-    """
-    Roda o indexer e captura output.
-
-    Retorna:
-        (json_stats, full_log, wall_time)
-    """
+    """Roda o indexer e captura (json_stats, full_log, wall_time)."""
     cmd = [
         sys.executable, "indexer.py",
         "-m", str(memory),
@@ -123,7 +101,6 @@ def run_indexer(
         print(f"  [stderr] {proc.stderr[-500:]}", flush=True)
         return {}, proc.stderr, wall_time
 
-    # Parse JSON da ultima linha do stdout
     stdout_lines = [l for l in proc.stdout.strip().split("\n") if l.strip()]
     if not stdout_lines:
         return {}, proc.stderr, wall_time
@@ -139,19 +116,17 @@ def run_indexer(
 
 
 def count_blocks_in_log(log_text: str) -> int:
-    """Conta linhas 'flush -> block_' no log para saber quantos blocks foram gerados."""
+    """Conta blocks gerados a partir das linhas 'flush -> block_'."""
     return len(re.findall(r"flush -> block_", log_text))
 
 
 def main():
     args = parse_args()
 
-    # Confere que o corpus existe
     if not os.path.isfile(args.corpus):
         print(f"erro: corpus nao encontrado: {args.corpus}", file=sys.stderr)
         sys.exit(1)
 
-    # Cria diretorio de experiments
     EXP_DIR.mkdir(parents=True, exist_ok=True)
 
     print("=" * 60)
@@ -173,7 +148,6 @@ def main():
         log_path = EXP_DIR / f"threads_{n}.log"
         json_path = EXP_DIR / f"threads_{n}.json"
 
-        # Limpa indice anterior se existir
         if os.path.isdir(index_dir):
             shutil.rmtree(index_dir)
 
@@ -185,12 +159,10 @@ def main():
             index_dir=index_dir,
         )
 
-        # Salva log
         with open(log_path, "w", encoding="utf-8") as f:
             f.write(stderr_log)
 
         if stats:
-            # Salva JSON
             with open(json_path, "w", encoding="utf-8") as f:
                 json.dump(stats, f, indent=2)
 
@@ -215,11 +187,9 @@ def main():
         else:
             print(f"  [erro] sem JSON valido para {n} threads", flush=True)
 
-        # Limpa indice (salvo se --keep-indexes)
         if not args.keep_indexes and os.path.isdir(index_dir):
             shutil.rmtree(index_dir)
 
-    # Salva summary.csv
     csv_path = EXP_DIR / "summary.csv"
     if results:
         with open(csv_path, "w", encoding="utf-8", newline="") as f:
@@ -227,12 +197,11 @@ def main():
             writer.writeheader()
             writer.writerows(results)
 
-        # Salva summary.json tambem
         json_summary_path = EXP_DIR / "summary.json"
         with open(json_summary_path, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=2)
 
-        # Calcula speedup relativo ao primeiro run
+        # Speedup relativo ao primeiro run.
         baseline = results[0]["ElapsedTime"]
 
         print("=" * 60)

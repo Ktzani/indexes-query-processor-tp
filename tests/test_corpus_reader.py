@@ -46,7 +46,7 @@ class TestCorpusReader(TempDirTestCase):
         path = os.path.join(self.tmpdir, "mixed.jsonl")
         with open(path, "w", encoding="utf-8") as f:
             f.write('{"id":"001","title":"OK","text":"","keywords":[]}\n')
-            f.write('isso nao eh JSON\n')
+            f.write('isso nao é JSON\n')
             f.write('{"id":"002","title":"OK2","text":"","keywords":[]}\n')
 
         reader = CorpusReader(path)

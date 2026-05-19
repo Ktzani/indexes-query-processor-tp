@@ -55,7 +55,7 @@ class TestRanker(unittest.TestCase):
         r = Ranker(k=2)
         candidates = [(0, -1.0), (1, -0.5), (2, -2.0)]
         result = r.top_k(candidates)
-        # Maior eh menos negativo
+        # Maior é menos negativo
         self.assertEqual(result[0], (1, -0.5))
 
     def test_large_input_performance(self):

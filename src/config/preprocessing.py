@@ -4,19 +4,14 @@ processor. CRITICO: indexer e processor DEVEM usar os mesmos valores
 aqui, senao queries nao casam com documentos.
 """
 
-# Idioma do corpus (Wikipedia inglesa). Usado pelo SnowballStemmer e
-# pela lista de stopwords do NLTK.
+# Wikipedia inglesa: usado por SnowballStemmer e pela lista de stopwords.
 STEMMER_LANGUAGE = "english"
 
-# Comprimento minimo de token apos normalizacao. Filtra ruido (letras
-# soltas, restos de tokenizacao).
+# Filtra ruido (letras soltas, restos de tokenizacao).
 MIN_TOKEN_LENGTH = 2
 
-# Comprimento maximo de token. Tokens absurdamente longos (e.g.,
-# strings de hash, lixo de HTML que escapou) sao descartados.
+# Descarta tokens absurdamente longos (hashes, lixo de HTML).
 MAX_TOKEN_LENGTH = 40
 
-# Se True, descarta tokens que sao puramente numericos.
-# Indexar numeros gigantescos polui o lexicon sem benefico para o
-# tipo de queries esperadas em entidades.
+# Indexar numeros polui o lexicon sem beneficio para queries em entidades.
 DROP_PURE_NUMERIC = True

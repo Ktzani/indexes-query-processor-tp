@@ -1,7 +1,7 @@
 """
 indexer.py - Entry point do indexador.
 
-Uso (conforme enunciado):
+Uso:
     python3 indexer.py -m <MEMORY> -c <CORPUS> -i <INDEX>
 
 Argumentos:
@@ -16,7 +16,12 @@ Output:
         - Number of Lists
         - Average List Size
 
-Logs de progresso vao para STDERR para nao poluir o JSON final.
+Fluxo:
+    CorpusReader -> Tokenizer -> Normalizer -> PartialIndex (SPIMI)
+    PartialIndex (cheio) -> dump em disco como block ordenado
+    blocks -> k-way merge -> inverted.idx final
+    paralelo: doc_index acumula original_id + length por doc
+    fim -> lexicon.pkl + doc_index.pkl + inverted.idx + JSON de stats
 """
 
 import argparse
@@ -59,15 +64,12 @@ def parse_args() -> argparse.Namespace:
         metavar="INDEX",
         help="Path to the output index directory",
     )
-    # Flag opcional para desenvolvimento; nao faz parte do enunciado.
     parser.add_argument(
         "--max-docs",
         type=int,
         default=None,
         help="(dev) limita numero de docs lidos (para testes rapidos)",
     )
-    # Permite override do numero de threads do pipeline.
-    # Util para experimentos de speedup.
     parser.add_argument(
         "--threads",
         type=int,
@@ -84,7 +86,6 @@ def validate_args(args: argparse.Namespace):
     if not os.path.isfile(args.c):
         print(f"erro: corpus nao encontrado: {args.c}", file=sys.stderr)
         sys.exit(1)
-    # Cria diretorio do indice se nao existir.
     os.makedirs(args.i, exist_ok=True)
 
 
@@ -95,10 +96,9 @@ def main():
     # NLTK precisa estar pronto antes das threads.
     ensure_nltk_data()
 
-    # Cronometra desde aqui (depois do setup, que pode incluir download).
+    # Cronometra depois do setup (que pode incluir download de dados NLTK).
     start_time = time.perf_counter()
 
-    # === Etapa 1: SPIMI ===
     blocks_dir = os.path.join(args.i, BLOCKS_DIR_NAME)
     memory = MemoryMonitor(budget_mb=args.m)
 
@@ -106,7 +106,6 @@ def main():
         f"[indexer] iniciando SPIMI: corpus={args.c}, mem={args.m}MB",
         file=sys.stderr,
     )
-    # Override de threads se especificado via CLI
     spimi_kwargs = {
         "corpus_path": args.c,
         "blocks_dir": blocks_dir,
@@ -121,7 +120,6 @@ def main():
         )
     spimi = SPIMIOrchestrator(**spimi_kwargs)
     block_paths, doc_index = spimi.run()
-    # doc_index agora eh tupla (original_ids, lengths); usamos len(original_ids).
     num_docs = len(doc_index[0]) if isinstance(doc_index, tuple) else len(doc_index)
     print(
         f"[indexer] SPIMI concluido: {len(block_paths)} blocks, "
@@ -129,7 +127,6 @@ def main():
         file=sys.stderr,
     )
 
-    # === Etapa 2: k-way merge externo ===
     inverted_path = os.path.join(args.i, INVERTED_INDEX_FILENAME)
     print(f"[indexer] iniciando merge externo de {len(block_paths)} blocks",
           file=sys.stderr)
@@ -139,25 +136,20 @@ def main():
         file=sys.stderr,
     )
 
-    # === Etapa 3: cleanup dos blocks parciais ===
     cleanup_blocks(block_paths)
-    # Remove o diretorio blocks/ se ficou vazio
     try:
         if os.path.isdir(blocks_dir) and not os.listdir(blocks_dir):
             os.rmdir(blocks_dir)
     except OSError:
         pass
 
-    # === Etapa 4: persiste lexicon e document index ===
     write_lexicon(lexicon, args.i)
     write_doc_index(doc_index, args.i)
     print(f"[indexer] indice persistido em {args.i}", file=sys.stderr)
 
-    # === Etapa 5: estatisticas ===
     elapsed = time.perf_counter() - start_time
     stats = compute_statistics(args.i, lexicon)
     stats["Elapsed Time"] = round(elapsed, 2)
-    # Reordena chaves para casar com o exemplo do enunciado.
     output = {
         "Index Size": stats["Index Size"],
         "Elapsed Time": stats["Elapsed Time"],
@@ -165,7 +157,6 @@ def main():
         "Average List Size": stats["Average List Size"],
     }
 
-    # JSON final no stdout (unica coisa que vai pro stdout!)
     print(json.dumps(output))
 
 

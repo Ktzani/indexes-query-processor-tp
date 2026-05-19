@@ -1,13 +1,9 @@
 """
-Le o corpus em formato JSONL (uma linha = um JSON com um documento)
-e produz objetos Document.
+Leitura streaming de um JSONL produzindo objetos Document.
 
-Implementado como generator para evitar carregar o corpus inteiro em
-memoria. Para um corpus de 4.6M documentos, isso eh essencial.
-
-Tolerancia a erros: linhas malformadas (JSON invalido ou campos
-faltando) sao puladas com warning no stderr. NAO interrompemos a
-indexacao por causa de uma linha corrompida.
+Streaming (generator) é essencial: o corpus tem ~4.6M docs e nao
+cabe em memoria. Linhas malformadas sao puladas com warning no
+stderr, sem interromper a indexacao.
 """
 
 import json
@@ -31,7 +27,6 @@ class CorpusReader:
         self._corpus_path = corpus_path
         self._max_docs = max_docs
 
-        # Contadores expostos pos-iteracao (para logs/relatorio).
         self.docs_read = 0
         self.docs_skipped = 0
 
@@ -58,10 +53,7 @@ class CorpusReader:
                 yield doc
 
     def _parse_line(self, line: str, line_num: int) -> Document | None:
-        """
-        Parseia uma linha JSON. Retorna None se a linha eh invalida.
-        Loga warning no stderr para linhas puladas (sem matar o proc).
-        """
+        """Parseia uma linha JSON. Retorna None se invalida (com warning)."""
         try:
             obj = json.loads(line)
         except json.JSONDecodeError as e:
@@ -71,12 +63,9 @@ class CorpusReader:
             )
             return None
 
-        # Verifica que eh um dict com pelo menos 'id'.
-        # title/text/keywords sao opcionais (corpus pode ter docs com
-        # campos faltando; preferimos indexar o que tem a pular).
         if not isinstance(obj, dict):
             print(
-                f"[corpus_reader] linha {line_num}: nao eh JSON object",
+                f"[corpus_reader] linha {line_num}: nao é JSON object",
                 file=sys.stderr,
             )
             return None
@@ -89,14 +78,12 @@ class CorpusReader:
             )
             return None
 
-        # Coercao defensiva: alguns datasets podem ter id como int.
         doc_id = str(doc_id)
 
         title = obj.get("title") or ""
         text = obj.get("text") or ""
         keywords = obj.get("keywords") or []
 
-        # Defesa contra estruturas inesperadas.
         if not isinstance(keywords, list):
             keywords = []
 

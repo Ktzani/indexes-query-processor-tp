@@ -18,7 +18,7 @@ from src.utils.io_utils import read_posting, read_uint32
 def _read_block(path: str) -> list[tuple[str, list[tuple[int, int]]]]:
     """Helper: le um arquivo de inverted_index final e retorna [(term, postings)]."""
     # Note: arquivo final NAO tem term_length/term, so num_postings + postings
-    # Esse helper eh para validar atraves do lexicon.
+    # Esse helper é para validar atraves do lexicon.
     raise NotImplementedError(
         "Use o lexicon retornado por merge_blocks() para validar"
     )

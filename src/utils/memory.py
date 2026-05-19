@@ -1,18 +1,9 @@
 """
 Monitoramento de memoria via psutil.
 
-CRITICO: o enunciado exige que o indexer respeite o orcamento de
-memoria informado via -m. Excesso pode ser killado por OOM. Este modulo
-centraliza a leitura do RSS (Resident Set Size) do processo, que eh a
-medida que o SO usa para decidir OOM.
-
-API publica:
-    MemoryMonitor(budget_mb): monitor com orcamento configurado
-    .used_mb()            -> float, RSS atual em MB
-    .used_ratio()         -> float em [0, ∞], fracao do orcamento usada
-    .should_flush()       -> bool, se passou do threshold de flush
-    .reset_peak()         -> reseta o pico observado (apos flush)
-    .peak_mb()            -> pico observado desde o ultimo reset
+O indexer deve respeitar o orcamento de memoria (-m) para nao ser
+killado por OOM. Usamos RSS (Resident Set Size), que é a medida que
+o SO usa para decidir OOM.
 """
 
 import os
@@ -36,7 +27,7 @@ class MemoryMonitor:
         return self._budget_mb
 
     def used_mb(self) -> float:
-        """Retorna o RSS atual do processo em MB."""
+        """RSS atual do processo em MB."""
         rss = self._process.memory_info().rss
         mb = rss / (1024.0 * 1024.0)
         if mb > self._peak_mb:
@@ -44,19 +35,18 @@ class MemoryMonitor:
         return mb
 
     def used_ratio(self) -> float:
-        """Fracao do orcamento atualmente em uso (0.0 a 1.0+)."""
+        """Fracao do orcamento em uso (0.0 a 1.0+)."""
         return self.used_mb() / self._budget_mb
 
     def should_flush(self) -> bool:
-        """True se o uso passou do threshold configurado de flush."""
+        """True se passou do threshold de flush."""
         return self.used_ratio() >= MEMORY_FLUSH_THRESHOLD
 
     def peak_mb(self) -> float:
         """Pico observado desde o ultimo reset_peak()."""
-        # Garante atualizacao do pico antes de reportar
         _ = self.used_mb()
         return self._peak_mb
 
     def reset_peak(self):
-        """Zera o pico (chamado apos um flush, para iniciar nova janela)."""
+        """Zera o pico (apos flush, para iniciar nova janela)."""
         self._peak_mb = self.used_mb()

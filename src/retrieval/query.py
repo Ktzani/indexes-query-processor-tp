@@ -1,22 +1,14 @@
 """
-Query: representa uma query de busca apos pre-processamento.
+Query: representa uma query apos pre-processamento.
 
-CRITICO: usa EXATAMENTE o mesmo Tokenizer + Normalizer que o indexer.
-Sem isso, queries nao casariam com documentos (por exemplo, se o
-indexer faz stemming mas o processor nao, 'running' no doc viraria
-'run' no indice mas a query 'running' continuaria 'running' e nao
-acharia nada).
+Mantem raw_text (para o JSON de output) e terms (lista deduplicada
+preservando ordem, para o DAAT).
 
-Decisao de design: a query mantem dois estados:
-    raw_text: a string original (para o JSON de output)
-    terms:    a lista de termos apos preprocessing (para o DAAT)
+IMPORTANTE: usa o MESMO Tokenizer + Normalizer do indexer. Caso contrario
+queries nao casariam com documentos.
 
-Termos duplicados na query: pre-processamos a lista PRESERVANDO
-duplicatas? Nao. Removemos duplicatas (preservando ordem). Razao:
-o DAAT conjunctive faz interseccao das postings, e termos repetidos
-nao mudam o conjunto resultante; alem disso o TF do termo no
-documento eh o que importa para o score, nao no quanto ele aparece
-na query.
+Removemos duplicatas porque a intersecao conjuntiva nao se beneficia
+delas e o TF que importa é o do documento, nao o da query.
 """
 
 from src.preprocessing.tokenizer import Tokenizer
@@ -33,11 +25,9 @@ class Query:
         normalizer: Normalizer,
     ):
         self._raw_text = raw_text.strip()
-        # Aplica o MESMO pipeline do indexer.
         tokens = tokenizer.tokenize(self._raw_text)
         normalized = normalizer.normalize(tokens)
-        # Remove duplicatas preservando ordem (importante para outputs
-        # determinasticos e para evitar trabalho duplicado no DAAT).
+        # Dedup preservando ordem para outputs deterministicos.
         seen = set()
         self._terms: list[str] = []
         for t in normalized:
@@ -47,19 +37,15 @@ class Query:
 
     @property
     def raw_text(self) -> str:
-        """Texto original da query (para o JSON de output)."""
         return self._raw_text
 
     @property
     def terms(self) -> list[str]:
-        """Termos preprocessados, sem duplicatas."""
         return self._terms
 
     def is_empty(self) -> bool:
-        """
-        True se a query nao gerou termos uteis (vazia, so stopwords,
-        ou termos descartados por tamanho).
-        """
+        """True se a query nao gerou termos uteis (vazia, so stopwords,
+        ou termos descartados por tamanho)."""
         return len(self._terms) == 0
 
     def __repr__(self) -> str:

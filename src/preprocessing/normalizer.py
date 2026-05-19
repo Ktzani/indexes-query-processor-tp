@@ -9,13 +9,11 @@ Pipeline:
       -> aplica stemming Snowball
       -> termos finais
 
-A ordem importa: removemos stopwords ANTES de stemming porque alguns
-stems de stopwords podem coincidir com termos uteis ("the" -> "the"
-nao tem problema, mas evitar trabalho desnecessario eh bom). E
-filtramos por tamanho ANTES de stemming porque a checagem eh barata.
+A ordem importa: filtramos ANTES do stemmer porque as checagens sao
+mais baratas.
 
-CRITICO: indexer.py e processor.py DEVEM usar a mesma instancia
-(mesma config) deste Normalizer, ou queries nao casam com documentos.
+IMPORTANTE: indexer e processor DEVEM usar a mesma config deste
+Normalizer, senao queries nao casam com documentos.
 """
 
 from nltk.corpus import stopwords
@@ -40,8 +38,6 @@ class Normalizer:
         drop_numeric: bool = DROP_PURE_NUMERIC,
     ):
         self._stemmer = SnowballStemmer(language)
-        # frozenset eh ~2x mais rapido que set para 'in' em lookups
-        # repetidos. ~180 stopwords em ingles.
         self._stopwords = frozenset(stopwords.words(language))
         self._min_length = min_length
         self._max_length = max_length
@@ -54,18 +50,14 @@ class Normalizer:
         """
         result = []
         for tok in tokens:
-            # Filtro 1: stopword
             if tok in self._stopwords:
                 continue
-            # Filtro 2: comprimento (antes de stemmer, pra economizar)
             if len(tok) < self._min_length or len(tok) > self._max_length:
                 continue
-            # Filtro 3: numero puro
             if self._drop_numeric and tok.isdigit():
                 continue
-            # Stemming
             stem = self._stemmer.stem(tok)
-            # Recheca tamanho apos stem (stems podem ficar curtos demais)
+
             if len(stem) < self._min_length:
                 continue
             result.append(stem)

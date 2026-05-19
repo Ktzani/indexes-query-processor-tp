@@ -1,7 +1,7 @@
 """
 processor.py - Entry point do query processor.
 
-Uso (conforme enunciado):
+Uso:
     python3 processor.py -i <INDEX> -q <QUERIES> -r <RANKER>
 
 Argumentos:
@@ -12,8 +12,6 @@ Argumentos:
 Output:
     Um JSON por linha no stdout, no formato:
         {"Query": "...", "Results": [{"ID": "...", "Score": ...}, ...]}
-
-Logs de progresso vao para STDERR.
 
 Fluxo por query:
     Query(raw) -> Tokenizer -> Normalizer -> terms
@@ -82,7 +80,7 @@ def validate_args(args: argparse.Namespace):
 
 
 def read_queries(queries_path: str) -> list[str]:
-    """Le todas as queries do arquivo, uma por linha. Ignora linhas vazias."""
+    """Le queries do arquivo, uma por linha. Ignora linhas vazias."""
     queries = []
     with open(queries_path, "r", encoding=TEXT_ENCODING) as f:
         for line in f:
@@ -101,35 +99,25 @@ def process_query(
     ranker: Ranker,
     doc_index: DocumentIndex,
 ) -> dict:
-    """
-    Processa uma query end-to-end. Retorna o dict pronto para serializar
-    como JSON.
-    """
-    # Preprocessing
+    """Processa uma query end-to-end e retorna dict pronto para JSON."""
     q = Query(raw_query, tokenizer, normalizer)
 
-    # Query vazia (so stopwords, ou texto vazio) -> sem resultados
     if q.is_empty():
         return {"Query": q.raw_text, "Results": []}
 
-    # DAAT: encontra docs candidatos
     daat_result = daat.intersect(q.terms)
 
-    # Sem matches -> sem resultados
     if not daat_result.matched_doc_ids:
         return {"Query": q.raw_text, "Results": []}
 
-    # Score cada candidato
     candidates: list[tuple[int, float]] = []
     for doc_id in daat_result.matched_doc_ids:
         postings = daat_result.matched_postings[doc_id]
         score = scorer.score(doc_id, postings)
         candidates.append((doc_id, score))
 
-    # Top-K
     top = ranker.top_k(candidates)
 
-    # Traduz doc_id interno para original_id (string), formata
     results = [
         {"ID": doc_index.get_original_id(doc_id), "Score": round(score, 4)}
         for doc_id, score in top
@@ -143,10 +131,8 @@ def main():
     validate_args(args)
     ranker_name = args.r.upper()
 
-    # Setup NLTK (idempotente, rapido se ja baixado)
     ensure_nltk_data()
 
-    # === Carrega indice (uma vez) ===
     print(f"[processor] carregando indice de {args.i}", file=sys.stderr)
     t0 = time.perf_counter()
     lexicon = TermLexicon(args.i)
@@ -159,18 +145,15 @@ def main():
         file=sys.stderr,
     )
 
-    # === Setup das estruturas de processamento ===
     tokenizer = Tokenizer()
     normalizer = Normalizer()
     ranker = Ranker(k=TOP_K)
     scorer = get_scorer(ranker_name, doc_index, lexicon)
 
-    # === Le queries ===
     queries = read_queries(args.q)
     print(f"[processor] {len(queries)} queries lidas", file=sys.stderr)
 
-    # === Processa todas as queries ===
-    # O InvertedIndex eh aberto uma unica vez, em context manager.
+    # InvertedIndex aberto uma unica vez para todas as queries.
     t_start = time.perf_counter()
     with InvertedIndex(args.i) as ii:
         daat = ConjunctiveDAAT(lexicon, ii)
@@ -182,10 +165,8 @@ def main():
             )
             t_query_elapsed = time.perf_counter() - t_query_start
 
-            # Imprime JSON da query no stdout (uma linha por query)
             print(json.dumps(output, ensure_ascii=False))
 
-            # Log de progresso no stderr
             print(
                 f"[processor] q{i}/{len(queries)}: {raw_query!r} "
                 f"-> {len(output['Results'])} results in {t_query_elapsed*1000:.1f}ms",

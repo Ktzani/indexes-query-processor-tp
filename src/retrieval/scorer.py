@@ -1,34 +1,20 @@
 """
 Scorers: TF-IDF e BM25.
 
-Recebem o DAATResult (com matched_postings) e o DocumentIndex, e
-calculam um score escalar para cada documento que casou.
-
-Decisoes de design:
-
-TF-IDF variant: ltn (query) x lnc-sem-cosine (doc)
-    l (log TF):       1 + log(tf)
-    n / t (idf):      query usa log(N/df); doc nao tem idf
-    c (cosine):       SIMPLIFICADO. Nao temos norma do doc armazenada;
-                      ranking continua valido (so muda scale).
-
+TF-IDF (variante ltn x lnc sem cosine - ranking preservado, so muda
+scale):
     score(doc, q) = sum_{t em q} (1 + log(tf_doc)) * log(N / df_t)
 
-    Como assumimos query sem duplicatas (Query.terms eh deduplicado),
-    o tf_query eh sempre 1 e nao precisa ser multiplicado.
+Como Query.terms é deduplicado, o tf_query é sempre 1.
 
-BM25 (Robertson, classico):
+BM25 (Robertson):
     score(doc, q) = sum_{t em q}
                     idf(t) * (tf * (k1+1)) /
                     (tf + k1 * (1 - b + b * |doc|/avgdl))
-
     idf(t) = log((N - df + 0.5) / (df + 0.5) + 1)
     (forma "BM25+" do Lucene, evita IDF negativo)
 
-    Hiperparametros: k1=1.2, b=0.75 (em config/processor.py)
-
-Performance: usa math.log (Python stdlib). numpy seria overkill para
-scoring pontual de 1 doc por vez. Para batch, vetorizaria com numpy.
+Hiperparametros (config/processor.py): k1=1.2, b=0.75.
 """
 
 import math
@@ -79,12 +65,7 @@ class Scorer(ABC):
 
 
 class TFIDFScorer(Scorer):
-    """
-    TF-IDF com variante lnc.ltn (sem cosine no doc).
-
-    Pre-calcula IDF de cada termo apenas uma vez no init para evitar
-    recalculo a cada documento.
-    """
+    """TF-IDF variante lnc.ltn (sem cosine no doc)."""
 
     @property
     def name(self) -> str:
@@ -100,10 +81,8 @@ class TFIDFScorer(Scorer):
             tf = posting.tf
             df = self._lexicon.get_df(term)
             if df == 0:
-                # Defesa: teoricamente nao deveria acontecer (o DAAT
-                # ja garante que o termo existe), mas seguro ignorar.
+                # Defesa: o DAAT ja garante que o termo existe.
                 continue
-            # log TF + IDF (sem cosine; ranking eh preservado)
             log_tf = 1.0 + math.log(tf)
             idf = math.log(self._num_docs / df)
             score += log_tf * idf
@@ -111,11 +90,7 @@ class TFIDFScorer(Scorer):
 
 
 class BM25Scorer(Scorer):
-    """
-    BM25 (Robertson) com IDF "BM25+" (sem negativos).
-
-    Hiperparametros lidos de config: BM25_K1=1.2, BM25_B=0.75.
-    """
+    """BM25 (Robertson) com IDF "BM25+" (sem negativos)."""
 
     def __init__(
         self,
@@ -139,7 +114,7 @@ class BM25Scorer(Scorer):
         query_postings: dict[str, Posting],
     ) -> float:
         doc_length = self._doc_index.get_length(doc_id)
-        # Fator de normalizacao por tamanho do doc (constante para o doc)
+        # Normalizacao por tamanho - constante para o doc.
         norm = 1.0 - self._b + self._b * (doc_length / self._avgdl)
 
         score = 0.0
@@ -148,9 +123,7 @@ class BM25Scorer(Scorer):
             df = self._lexicon.get_df(term)
             if df == 0:
                 continue
-            # IDF "BM25+" do Lucene
             idf = math.log((self._num_docs - df + 0.5) / (df + 0.5) + 1.0)
-            # TF saturado com normalizacao por tamanho
             tf_component = (tf * (self._k1 + 1.0)) / (tf + self._k1 * norm)
             score += idf * tf_component
         return score
@@ -161,10 +134,7 @@ def get_scorer(
     doc_index: DocumentIndex,
     lexicon: TermLexicon,
 ) -> Scorer:
-    """
-    Factory: retorna o scorer apropriado pelo nome.
-    Aceita 'TFIDF' ou 'BM25' (case-insensitive).
-    """
+    """Factory: 'TFIDF' ou 'BM25' (case-insensitive)."""
     name_normalized = name.strip().upper()
     if name_normalized == "TFIDF":
         return TFIDFScorer(doc_index, lexicon)

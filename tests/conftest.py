@@ -22,7 +22,7 @@ ensure_nltk_data()
 def make_corpus(docs: list[dict], dir_path: str = None) -> str:
     """
     Cria um arquivo JSONL temporario com os documentos fornecidos.
-    Retorna o caminho. O caller eh responsavel pela remocao.
+    Retorna o caminho. O caller é responsavel pela remocao.
     """
     if dir_path:
         fd, path = tempfile.mkstemp(suffix=".jsonl", dir=dir_path)

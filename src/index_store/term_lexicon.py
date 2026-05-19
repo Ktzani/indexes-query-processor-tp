@@ -1,12 +1,9 @@
 """
-TermLexicon: API de leitura do lexicon term -> (offset, df).
+Leitura do lexicon: term -> (offset, df).
 
-Carrega lexicon.pkl em memoria. Para 4.6M docs com ~3-5M termos
-unicos esperados, gasta ~100-150 MB. Aceitavel.
-
-A presenca de um termo no lexicon eh CRUCIAL no DAAT: se um termo da
-query nao esta no lexicon, a intersecao conjunctiva eh vazia
-imediatamente (DAAT pode retornar 0 resultados sem ler o disco).
+Carregado inteiro em memoria. CRUCIAL no DAAT: se um termo da query
+nao existe no lexicon, a intersecao conjuntiva é vazia imediatamente
+(curto-circuito sem ler o disco).
 """
 
 import os
@@ -16,7 +13,7 @@ from src.config.indexer import TERM_LEXICON_FILENAME
 
 
 class TermLexicon:
-    """API de leitura do lexicon."""
+    """Leitura do lexicon."""
 
     def __init__(self, index_dir: str):
         """Carrega lexicon.pkl em RAM."""
