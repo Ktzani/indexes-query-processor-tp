@@ -1,7 +1,7 @@
 """
 Scorers: TF-IDF e BM25.
 
-TF-IDF (variante ltn x lnc sem cosine - ranking preservado, so muda
+TF-IDF (variante ltn x lnc sem cosine — ranking preservado, so muda
 scale):
     score(doc, q) = sum_{t em q} (1 + log(tf_doc)) * log(N / df_t)
 
@@ -81,7 +81,6 @@ class TFIDFScorer(Scorer):
             tf = posting.tf
             df = self._lexicon.get_df(term)
             if df == 0:
-                # Defesa: o DAAT ja garante que o termo existe.
                 continue
             log_tf = 1.0 + math.log(tf)
             idf = math.log(self._num_docs / df)
@@ -114,8 +113,8 @@ class BM25Scorer(Scorer):
         query_postings: dict[str, Posting],
     ) -> float:
         doc_length = self._doc_index.get_length(doc_id)
-        # Normalizacao por tamanho - constante para o doc.
-        norm = 1.0 - self._b + self._b * (doc_length / self._avgdl)
+
+        normalization = 1.0 - self._b + self._b * (doc_length / self._avgdl)
 
         score = 0.0
         for term, posting in query_postings.items():
@@ -124,7 +123,7 @@ class BM25Scorer(Scorer):
             if df == 0:
                 continue
             idf = math.log((self._num_docs - df + 0.5) / (df + 0.5) + 1.0)
-            tf_component = (tf * (self._k1 + 1.0)) / (tf + self._k1 * norm)
+            tf_component = (tf * (self._k1 + 1.0)) / (tf + self._k1 * normalization)
             score += idf * tf_component
         return score
 
