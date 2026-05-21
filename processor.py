@@ -98,17 +98,27 @@ def process_query(
     scorer,
     ranker: Ranker,
     doc_index: DocumentIndex,
-) -> dict:
-    """Processa uma query end-to-end e retorna dict pronto para JSON."""
+) -> tuple[dict, dict]:
+    """
+    Processa uma query end-to-end. Retorna (output_json, metrics)
+    onde metrics inclui skip_ratio, postings_scanned, postings_in_lists.
+    """
     q = Query(raw_query, tokenizer, normalizer)
 
     if q.is_empty():
-        return {"Query": q.raw_text, "Results": []}
+        return ({"Query": q.raw_text, "Results": []},
+                {"skip_ratio": None, "scanned": 0, "in_lists": 0})
 
     daat_result = daat.intersect(q.terms)
 
+    metrics = {
+        "skip_ratio": daat_result.skip_ratio,
+        "scanned": daat_result.postings_scanned,
+        "in_lists": daat_result.postings_in_lists,
+    }
+
     if not daat_result.matched_doc_ids:
-        return {"Query": q.raw_text, "Results": []}
+        return ({"Query": q.raw_text, "Results": []}, metrics)
 
     candidates: list[tuple[int, float]] = []
     for doc_id in daat_result.matched_doc_ids:
@@ -123,7 +133,7 @@ def process_query(
         for doc_id, score in top
     ]
 
-    return {"Query": q.raw_text, "Results": results}
+    return ({"Query": q.raw_text, "Results": results}, metrics)
 
 
 def main():
@@ -153,23 +163,34 @@ def main():
     queries = read_queries(args.q)
     print(f"[processor] {len(queries)} queries lidas", file=sys.stderr)
 
-    # InvertedIndex aberto uma unica vez para todas as queries.
     t_start = time.perf_counter()
+    skip_ratios = [] 
     with InvertedIndex(args.i) as ii:
         daat = ConjunctiveDAAT(lexicon, ii)
 
         for i, raw_query in enumerate(queries, start=1):
             t_query_start = time.perf_counter()
-            output = process_query(
+            output, metrics = process_query(
                 raw_query, tokenizer, normalizer, daat, scorer, ranker, doc_index,
             )
             t_query_elapsed = time.perf_counter() - t_query_start
 
             print(json.dumps(output, ensure_ascii=False))
 
+            # Log de progresso no stderr, incluindo skip_ratio
+            if metrics["skip_ratio"] is not None:
+                skip_ratios.append(metrics["skip_ratio"])
+                skip_str = (
+                    f"skip_ratio={metrics['skip_ratio']:.4f} "
+                    f"(scanned={metrics['scanned']}/in_lists={metrics['in_lists']})"
+                )
+            else:
+                skip_str = "skip_ratio=N/A"
+
             print(
                 f"[processor] q{i}/{len(queries)}: {raw_query!r} "
-                f"-> {len(output['Results'])} results in {t_query_elapsed*1000:.1f}ms",
+                f"-> {len(output['Results'])} results in {t_query_elapsed*1000:.1f}ms; "
+                f"{skip_str}",
                 file=sys.stderr,
             )
 
@@ -179,6 +200,13 @@ def main():
         f"{elapsed_total:.2f}s ({elapsed_total/max(len(queries),1)*1000:.1f}ms/query)",
         file=sys.stderr,
     )
+    if skip_ratios:
+        avg_skip = sum(skip_ratios) / len(skip_ratios)
+        print(
+            f"[processor] skip_ratio medio: {avg_skip:.4f} "
+            f"(min={min(skip_ratios):.4f}, max={max(skip_ratios):.4f})",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":
